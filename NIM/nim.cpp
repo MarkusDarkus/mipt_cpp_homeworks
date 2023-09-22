@@ -18,8 +18,13 @@ void fill(std::vector<int> &v){
 }
 
 void print(std::vector<int> &v){
-  for(int i=0; i<v.size(); i++)
-    std::cout<<v[i]<<" ";
+  for(int i=0; i<v.size(); i++){
+    for(int j=0; j<v[i]; j++){
+      std::cout<<"*";
+    }
+    std::cout<<" ("<<v[i]<<")";
+    std::cout<<"\n";
+  }
   std::cout<<"\n";
 }
 
@@ -40,25 +45,59 @@ int index(std::string &s){
 }
 
 
+
+
+
+int correct_input(bool upper = false, int up_bound=-1, int low = 0) {
+    bool not_first = false;
+    int s_a = -1;
+    std::string err = "Wrong number!!!\n";
+    std::string tip = "Enter normal number!!!\n";
+    do {
+        std::string S_mode = "";
+        s_a = 0; // обнуляем всё и перезаписываем
+                
+        if (std::cin.fail()) { // если с прошл цикла фейл, чиним
+            std::cin.clear();
+        }
+        
+        if (not_first) { // если true - уже ошиблись, можем писать
+            std::cout << err;
+        } else {
+            not_first = true;
+        }
+
+        std::cout << tip; std::cin >> S_mode; // 1ая перем
+        try {
+            s_a = std::stoi(S_mode);  // если не число, улетаем
+        } catch (...) {
+            std::cout << "\n";
+        }
+    } while (std::cin.fail() || s_a <= low || (s_a > up_bound && upper));
+    return s_a;
+}
+
+
 int main() {
     // Начальные условия - количество камней на каждой куче
     srand(0);
     int n;
     
-    std::cout<<"Введите число куч  --  ";
-    std::cin>>n;
+    std::cout<<"Enter number of heaps  --  ";
+    n=correct_input(false, 1,0);
     std::vector<int> game(n);
-    std::cout<<"Рандомно : 1, Не рандомно : 2 "<<std::endl;
-    int status =1;
-    std::cin>>status;
+    std::cout<<"Random : 1, No Random : 2 "<<std::endl;
+    int status = 1;
+    status = correct_input(true, 2, 0);
     if(status==1){
       
-      std::cout<<"Происходит создание кучек для игры..."<<std::endl;
+      std::cout<<"It's going creation of heaps..."<<std::endl;
       fill(game);
     }
     else{
       for(int i=0;i<n;i++){
-        std::cin>>game[i];
+        
+        game[i]=correct_input(false);
       }
       
     }
@@ -73,34 +112,38 @@ int main() {
 
         // Ход игрока
         int number, stones;
-        std::cout << "Your turn - Enter heap number"<<1<<" to "<<n<<std::endl;
-        std::cin >> number;
+        std::cout << "Your turn - Enter heap number "<<1<<" to "<<n<<std::endl;
+        number = correct_input(false, 1,0);
         if(number>n || number<1){
-          std::cout<<"Такой кучки у нас нет";
+          std::cout<<"It is not available number! Please, enter right";
           continue;
         }
         std::cout << "Enter the number of stones you want to remove: ";
         
         
-        std::cin >> stones;
+        stones = correct_input(false);
         if(stones<1){
-          std::cout<<"Введите натуральное число камней";
+          std::cout<<"It is not available number! Please, enter positive integers";
           continue;
         }
       
         // Обновляем состояние куч
+        int flag=0;
         for (int i=0;i<n;i++){
           if(i==number-1){
             if(game[i]>=stones){
               game[i]-=stones;
             }
             else{
-              std::cout<<"Введено неверное число камней"<<std::endl;
-              continue;
+              std::cout<<"It is not available number!"<<std::endl;
+              flag=1;
+              break;
             }
             break;
           }
         }
+        if(flag)
+          continue;
 
         // Проверяем, завершилась ли игра
         
@@ -116,7 +159,7 @@ int main() {
         int t = 0;
       
         if (xorSum != 0) {
-            std::cout<<"xor != 0 "<<xorSum<<std::endl;
+            std::cout<<"Bot is thinking..."<<std::endl;
             // Ищем кучу, которую необходимо изменить
             // чтобы получить xorSum равный 0
             std::bitset<16> s=xorSum;
@@ -131,7 +174,7 @@ int main() {
             }
         }
         else {
-            std::cout<<"xor = 0 "<<xorSum<<std::endl;
+            std::cout<<"Bot is thinking..."<<xorSum<<std::endl;
             // Если xorSum равен 0, то бот случайным образом выбирает кучу
             // и удаляет из нее случайное количество камней
           
