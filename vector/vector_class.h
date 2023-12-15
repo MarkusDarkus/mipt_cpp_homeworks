@@ -52,22 +52,43 @@ Vector<T>::Vector() : len{0}, capacity{0}, arr{nullptr} {}
 
 template<typename T>
 Vector<T>::Vector (int n) : len{n}, capacity{n}, arr{new T[n]} {
-    for(int i = 0; i < n; i++)
-        arr[i] = T();
+    try{
+        for(int i = 0; i < n; i++)
+            arr[i] = T();
+    }
+    catch(...)
+    {
+        delete[] arr;
+        throw std::runtime_error("template type doesn't have a copying constructor");
+    }
 }
 
 template<typename T>
 Vector<T>::Vector (T *array) : len{int(sizeof(array) / sizeof(T))}, capacity{(sizeof(array) / sizeof(T))}, arr{new T[int(sizeof(array) / sizeof(T))]}
 {
-    for (int i = 0; i < int(sizeof(array) / sizeof(T)); ++i)
-        arr[i] = array[i];
+    try{
+        for (int i = 0; i < int(sizeof(array) / sizeof(T)); ++i)
+            arr[i] = array[i];
+    }
+    catch(...)
+    {
+        delete[] arr;
+        throw std::runtime_error("template type doesn't have a copying constructor");
+    }
 }
 
 template<typename T>
 Vector<T>::Vector (const Vector<T>& v) : len{int(v.size())}, capacity{int(v.capacity())}, arr{new T[v.capacity]}
 {
-    for (int i = 0; i < v.size(); ++i)
-        arr[i] = v[i];
+    try{
+        for (int i = 0; i < v.size(); ++i)
+            arr[i] = v[i];
+    }
+    catch(...)
+    {
+        delete[] arr;
+        throw std::runtime_error("template type doesn't have a copying constructor");
+    }
 }
 
 template<typename T>
@@ -75,20 +96,57 @@ Vector<T>& Vector<T>::operator= (const Vector<T>& v)
 {
     if(this == &v)
         return *this;
+
+    bool flag = true;
     if(v.size() <= capacity)
     {
-        for(int i = 0; i < v.size(); i++)
+        try
         {
-            arr[i] = v[i];
+            for(int i = 0; i < v.size(); i++)
+            {
+                try
+                {
+                    arr[i].~T();
+                }
+                catch(...)
+                {
+                    flag = true;
+                    throw std::runtime_error("template type doesn't have a destructor");
+                }
+                arr[i] = v[i];
+            }
+            len = v.size();
+            return *this;
         }
-        len = v.size();
-        return *this;
+        catch(...)
+        {
+            if(flag)
+                throw std::runtime_error("template type doesn't have a destructor");
+            throw std::runtime_error("template type doesn't have a copying constructor");
+        }
     }
-    T* temp_elem = new T[v.size()];
-    for(int i = 0; i < v.size(); i++)
-        temp_elem[i] = v[i];
-    for(int i = 0; i < len; i++)
-        arr[i].~T();
+    T* temp_elem;
+    try
+    {
+        T* temp_elem = new T[v.size()];
+        for(int i = 0; i < v.size(); i++)
+            temp_elem[i] = v[i];
+    }
+    catch(...)
+    {
+        delete[] arr;
+        throw std::runtime_error("template type doesn't have a destructor");
+    }
+    try{
+        for(int i = 0; i < len; i++)
+            arr[i].~T();
+        delete[] arr;
+    }
+    catch(...)
+    {
+        delete[] arr;
+        throw std::runtime_error("template type doesn't have a destructor");
+    }
     delete[] arr;
     arr = temp_elem;
     capacity = v.size();
@@ -108,8 +166,17 @@ Vector<T>::Vector (Vector<T>&& v) : arr{v.size()}, arr{v.arr}
 template<typename T>
 Vector<T>& Vector<T>::operator= (Vector<T>&& v)
 {
-    for(int i = 0; i < len; i++)
-        arr[i].~T();//elem[i].~T();
+    try
+    {
+        for(int i = 0; i < len; i++)
+            arr[i].~T();
+    }
+    catch(...)
+    {
+        delete[] arr;
+        throw std::runtime_error("template type doesn't have a destructor or has errors in it");
+    }
+    
     delete[] arr;//delete[] elem;
     arr = v.arr;
     arr = v.size();
@@ -126,8 +193,17 @@ Vector<T>::~Vector ()
 { 
     if(arr != nullptr && capacity != 0 && len != 0)
     {
-        for(int i = 0; i < len; i++)
-            arr[i].~T();
+        try
+        {
+            for(int i = 0; i < len; i++)
+                arr[i].~T();
+        }
+        catch(...)
+        {
+            delete[] arr;
+            throw std::runtime_error("template type doesn't have a destructor or has errors in it");
+        }
+
         delete[] arr;
     }
 }
@@ -202,11 +278,35 @@ void Vector<T>::reserve (int new_alloc)
     if(new_alloc <= capacity)
         return;
     T* p = new T[new_alloc];
-    for(int i = 0; i < len; i++)
+    bool flag = false;
+
+    try
     {
-        p[i]=arr[i];
-        arr[i].~T();
+        for(int i = 0; i < len; i++)
+        {
+            try
+            {
+                p[i]=arr[i];
+            }
+            catch(...)
+            {
+                flag = true;
+                throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+            }
+            arr[i].~T();
+        }
     }
+    catch(...)
+    {
+        if(constructor_error_flag)
+        {
+            delete[] p;
+            throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+        }
+        delete[] p;
+        throw std::runtime_error("template type doesn't have a destructor or has errors in it");
+    }
+    
     delete[] arr;
     arr= p;
     capacity = new_alloc;
@@ -239,11 +339,29 @@ void Vector<T>::push_back (T new_elem)
     else if(capacity == 0)
     {
         T* temp_elem = new T[8];;//new T[8];
-        temp_elem[0] = new_elem;//temp_elem[0] = new_elem;
+        try
+        {
+            temp_elem[0] = new_elem;
+        }
+        catch(...)
+        {
+            delete[] temp_elem;
+            throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+        }
+        
+        //temp_elem[0] = new_elem;
         if(arr != nullptr)
         {
-            for(int i = 0; i < len; i++)
-                arr[i].~T();
+            try
+            {
+                for(int i = 0; i < len; i++)
+                    arr[i].~T();
+            }
+            catch(...)
+            {
+                throw std::runtime_error("template type doesn't have a destructor or has errors in it");
+            }
+            
             delete[] arr;
         }
         arr = temp_elem;
@@ -253,11 +371,27 @@ void Vector<T>::push_back (T new_elem)
     else if(len == capacity)
     {
         T* temp_elem = new T[capacity*2];
-        for(int i = 0; i < len; i++)
-            temp_elem[i] = arr[i];
-        temp_elem[len] = new_elem;
-        for(int i = 0; i < len; i++)
-            arr[i].~T();
+        try
+        {
+            for(int i = 0; i < len; i++)
+                temp_elem[i] = arr[i];
+            temp_elem[len] = new_elem;    
+        }
+        catch(...)
+        {
+            delete[] temp_elem;
+            throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+        }
+        try
+        {
+            for(int i = 0; i < len; i++)
+                arr[i].~T();
+        }
+        catch(...)
+        {
+            delete[] temp_elem;
+            throw std::runtime_error("template type doesn't have a destructor or has errors in it");
+        }
         delete[] arr;
         arr = temp_elem;
 
@@ -266,7 +400,14 @@ void Vector<T>::push_back (T new_elem)
     }
     else
     {
-        arr[len] = new_elem;
+        try
+        {
+            arr[len] = new_elem;
+        }
+        catch(...)
+        {
+            throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+        }
         len++;
     }
 }
@@ -282,13 +423,20 @@ void Vector<T>::insert (int ind, T new_elem)
         return;
     }
 
-    push_back(T());
+    push_back(0);
 
-    for(int i = len - 1; i > ind; i--)
+    try
     {
-        arr[i] = arr[i-1];
+        for(int i = len - 1; i > ind; i--)
+        {
+            arr[i] = arr[i-1];
+        }
+        arr[ind] = new_elem;
     }
-    arr[ind] = new_elem;
+    catch(...)
+    {
+        throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+    }
 }
 
 template<typename T>
@@ -300,7 +448,15 @@ void Vector<T>::pop_back ()
         throw std::runtime_error("can't pop_back from an empty vector\n");
     else if(capacity > 0)
     {
-        back().~T();
+        try
+        {
+            back().~T();
+        }
+        catch(...)
+        {
+            throw std::runtime_error("template type doesn't have a destructor or has errors in it");
+        }
+        
         len--;
         if(len == 0)
         {
@@ -314,10 +470,29 @@ void Vector<T>::pop_back ()
         else if(2*len <= capacity)
         {
             T* temp_elem = new T[len];
-            for(int i = 0; i < len; i++)
+            bool flag = false;
+            try
             {
-                temp_elem[i] = arr[i];
-                arr[i].~T();
+                for(int i = 0; i < len; i++)
+                {
+                    try
+                    {
+                        temp_elem[i] = arr[i];
+                    }
+                    catch(...)
+                    {
+                        flag = true;
+                        throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+                    }
+                    arr[i].~T();
+                }
+            }
+            catch(...)
+            {
+                delete[] arr;
+                if(flag)
+                    throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+                throw std::runtime_error("template type doesn't have a destructor or has errors in it");
             }
             delete[] arr;
             arr = temp_elem;
@@ -337,9 +512,26 @@ void Vector<T>::pop(int ind)
         pop_back();
         return;
     }
-    for(int i = ind; i < len-1; i++)
-        arr[i] = arr[i+1];
-    back().~T();
+    try
+    {
+        for(int i = ind; i < len-1; i++)
+            arr[i] = arr[i+1];
+    }
+    catch(...)
+    {
+        throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+    }
+    try
+    {
+        back().~T();
+    }
+    catch(...)
+    {
+        throw std::runtime_error("template type doesn't have a destructor or has errors in it");
+    }
+
+
+
     len--;
     if(len == 0)
     {
@@ -353,14 +545,32 @@ void Vector<T>::pop(int ind)
     else if(2*len <= capacity)
     {
         T* temp_elem = new T[len];
-        for(int i = 0; i < len; i++)
+        bool flag = false;
+        try
         {
-            temp_elem[i] = arr[i];
-            arr[i].~T();
+            for(int i = 0; i < len; i++)
+            {
+                try
+                {
+                    temp_elem[i] = arr[i];
+                }
+                catch(...)
+                {
+                    flag = true;
+                    throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+                }
+                arr[i].~T();
+            }
+        }
+        catch(...)
+        {
+            delete[] arr;
+            if(flag)
+                throw std::runtime_error("template type doesn't have a copying constructor or has errors in it");
+            throw std::runtime_error("template type doesn't have a destructor or has errors in it");
         }
         delete[] arr;
         arr = temp_elem;
-        
         capacity = len;
     }
 }
